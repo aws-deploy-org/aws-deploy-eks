@@ -28,6 +28,7 @@ permissions:
   id-token: write   # Required for OIDC
   contents: read    # Required to checkout code
   pull-requests: write  # Required to comment on PRs
+  packages: read   
 
 env:
   TF_VERSION: '1.14.6'
@@ -48,6 +49,10 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+      
+      - name: Configure Git Credentials
+        run: |
+          git config --global url."https://oauth2:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
