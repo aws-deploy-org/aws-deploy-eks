@@ -1,4 +1,4 @@
-resource "aws_vpc" "this" {
+resource "aws_vpc" "lz_aws_vpc" {
   count = var.create_vpc ? 1 : 0
 
   cidr_block = var.vpc.cidr_block
@@ -24,7 +24,7 @@ resource "aws_vpc" "this" {
   region = var.vpc.region
 }
 
-resource "aws_subnet" "this" {
+resource "aws_subnet" "lz_aws_subnet" {
   for_each = var.subnets
 
   vpc_id = coalesce(each.value.vpc_id, local.vpc_id)
@@ -60,14 +60,14 @@ resource "aws_subnet" "this" {
   tags = each.value.tags
 }
 
-resource "aws_internet_gateway" "this" {
+resource "aws_internet_gateway" "lz_aws_internet_gateway" {
   count = var.create_internet_gateway ? 1 : 0
 
   vpc_id = var.internet_gateway.vpc_id != null ? var.internet_gateway.vpc_id : local.vpc_id
   tags   = var.internet_gateway.tags
 }
 
-resource "aws_eip" "this" {
+resource "aws_eip" "lz_aws_eip" {
   for_each = var.eips
 
    domain = each.value.domain
@@ -86,7 +86,7 @@ resource "aws_eip" "this" {
   tags = each.value.tags
 }
 
-resource "aws_nat_gateway" "this" {
+resource "aws_nat_gateway" "lz_aws_nat_gateway" {
   for_each = var.nat_gateways
 
   allocation_id = each.value.allocation_id != null ? each.value.allocation_id : (
@@ -116,7 +116,7 @@ resource "aws_nat_gateway" "this" {
   }
 }
 
-resource "aws_route_table" "this" {
+resource "aws_route_table" "lz_aws_route_table" {
   for_each = var.route_tables
 
   vpc_id = each.value.vpc_id != null ? each.value.vpc_id : local.vpc_id
@@ -144,7 +144,7 @@ resource "aws_route_table" "this" {
   tags             = each.value.tags
 }
 
-resource "aws_route" "this" {
+resource "aws_route" "lz_aws_route" {
   for_each = var.routes
 
   route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.this[each.value.route_table_key].id
@@ -172,7 +172,7 @@ resource "aws_route" "this" {
   region = each.value.region
 }
 
-resource "aws_route_table_association" "this" {
+resource "aws_route_table_association" "lz_aws_route_table_association" {
   for_each = var.route_table_associations
 
   route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.this[each.value.route_table_key].id
