@@ -1,5 +1,5 @@
 module "vpc" {
-  source = "../../lz-nw-vpc"
+  source = "https://github.com/Terraform-IaC-Deployments/lz-nw-vpc.git?ref=v1.0.0"
   vpc = {
     cidr_block = "10.0.0.0/16"
     azs        = ["us-east-1a", "us-east-1b", "us-east-1c"]
