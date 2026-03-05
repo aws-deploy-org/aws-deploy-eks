@@ -70,9 +70,7 @@ resource "aws_internet_gateway" "this" {
 resource "aws_eip" "this" {
   for_each = var.eips
 
-  # Arguments per docs (some are mutually exclusive in AWS behavior)
-  vpc    = each.value.vpc
-  domain = each.value.domain
+   domain = each.value.domain
 
   address                 = each.value.address
   public_ipv4_pool         = each.value.public_ipv4_pool
@@ -103,9 +101,7 @@ resource "aws_nat_gateway" "this" {
   tags = each.value.tags
 
   availability_mode    = each.value.availability_mode
-  availability_zone    = each.value.availability_zone
-  availability_zone_id = each.value.availability_zone_id
-
+ 
   secondary_allocation_ids           = each.value.secondary_allocation_ids
   secondary_private_ip_address_count = each.value.secondary_private_ip_address_count
   secondary_private_ip_addresses     = each.value.secondary_private_ip_addresses
@@ -113,9 +109,9 @@ resource "aws_nat_gateway" "this" {
   dynamic "availability_zone_address" {
     for_each = each.value.availability_zone_address
     content {
-      allocation_id      = availability_zone_address.value.allocation_id
-      private_ip         = availability_zone_address.value.private_ip
-      network_border_group = availability_zone_address.value.network_border_group
+      allocation_ids      = availability_zone_address.value.allocation_ids
+      availability_zone    = availability_zone_address.value.availability_zone != null ? availability_zone_address.value.availability_zone : null
+      availability_zone_id = availability_zone_address.value.availability_zone != null ? null : availability_zone_address.value.availability_zone_id
     }
   }
 }
@@ -135,7 +131,6 @@ resource "aws_route_table" "this" {
 
       egress_only_gateway_id    = route.value.egress_only_gateway_id
       gateway_id                = route.value.gateway_id
-      instance_id               = route.value.instance_id
       nat_gateway_id            = route.value.nat_gateway_id
       local_gateway_id          = route.value.local_gateway_id
       network_interface_id      = route.value.network_interface_id
