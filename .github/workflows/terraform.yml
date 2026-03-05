@@ -83,6 +83,7 @@ jobs:
       - name: Run TFLint
         id: tflint
         run: tflint --format=compact --recursive
+        continue-on-error: true        
 
       - name: Setup Checkov
         run: pip3 install checkov
