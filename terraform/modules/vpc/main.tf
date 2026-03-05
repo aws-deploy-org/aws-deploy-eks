@@ -162,7 +162,6 @@ resource "aws_route" "this" {
     each.value.igw_ref == true ? aws_internet_gateway.this[0].id : null
   )
 
-  instance_id               = each.value.instance_id
   nat_gateway_id            = each.value.nat_gateway_id != null ? each.value.nat_gateway_id : (each.value.nat_gateway_key != null ? aws_nat_gateway.this[each.value.nat_gateway_key].id : null)
   local_gateway_id          = each.value.local_gateway_id
   network_interface_id      = each.value.network_interface_id
