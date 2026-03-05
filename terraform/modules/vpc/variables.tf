@@ -8,6 +8,10 @@ variable "create_vpc" {
   description = "Whether to create a new VPC."
   type        = bool
   default     = true
+  validation {
+    condition     = var.create_vpc || (var.existing_vpc_id != null && var.existing_vpc_id != "")
+    error_message = "When create_vpc=false, existing_vpc_id must be set."
+  }
 }
 
 variable "existing_vpc_id" {
@@ -81,6 +85,15 @@ variable "subnets" {
     private_dns_hostname_type_on_launch = optional(string)
   }))
   default = {}
+    validation {
+    condition = alltrue([
+      for k, s in var.subnets :
+      !(
+        (s.availability_zone != null && s.availability_zone_id != null)
+      )
+    ])
+    error_message = "Each subnet must set only one of availability_zone or availability_zone_id."
+  }
 }
 
 variable "create_internet_gateway" {
@@ -119,6 +132,16 @@ variable "eips" {
     tags = optional(map(string))
   }))
   default = {}
+
+    validation {
+    condition = alltrue([
+      for k, e in var.eips :
+      !(
+        (e.vpc != null && e.domain != null)
+      )
+    ])
+    error_message = "Each EIP must set only one of vpc or domain."
+  }
 }
 
 variable "nat_gateways" {
@@ -212,6 +235,17 @@ variable "routes" {
     region = optional(string)
   }))
   default = {}
+
+    validation {
+    condition = alltrue([
+      for k, r in var.routes :
+      (
+        # at least one destination field set
+        (r.destination_cidr_block != null || r.destination_ipv6_cidr_block != null || r.destination_prefix_list_id != null)
+      )
+    ])
+    error_message = "Each route must set a destination_* field."
+  }
 }
 
 variable "route_table_associations" {
@@ -228,48 +262,4 @@ variable "route_table_associations" {
     region = optional(string)
   }))
   default = {}
-}
-
-# --- Validations (best-practice guardrails) ---
-
-variable "validation" {
-  description = "No-op variable to host cross-field validations."
-  type        = object({})
-  default     = {}
-
-  validation {
-    condition     = var.create_vpc || (var.existing_vpc_id != null && var.existing_vpc_id != "")
-    error_message = "When create_vpc=false, existing_vpc_id must be set."
-  }
-
-  validation {
-    condition = alltrue([
-      for k, s in var.subnets :
-      !(
-        (s.availability_zone != null && s.availability_zone_id != null)
-      )
-    ])
-    error_message = "Each subnet must set only one of availability_zone or availability_zone_id."
-  }
-
-  validation {
-    condition = alltrue([
-      for k, e in var.eips :
-      !(
-        (e.vpc != null && e.domain != null)
-      )
-    ])
-    error_message = "Each EIP must set only one of vpc or domain."
-  }
-
-  validation {
-    condition = alltrue([
-      for k, r in var.routes :
-      (
-        # at least one destination field set
-        (r.destination_cidr_block != null || r.destination_ipv6_cidr_block != null || r.destination_prefix_list_id != null)
-      )
-    ])
-    error_message = "Each route must set a destination_* field."
-  }
 }
