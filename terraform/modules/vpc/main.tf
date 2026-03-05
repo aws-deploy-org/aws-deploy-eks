@@ -90,13 +90,13 @@ resource "aws_nat_gateway" "lz_aws_nat_gateway" {
   for_each = var.nat_gateways
 
   allocation_id = each.value.allocation_id != null ? each.value.allocation_id : (
-    each.value.eip_key != null ? aws_eip.this[each.value.eip_key].allocation_id : null
+    each.value.eip_key != null ? aws_eip.lz_aws_eip[each.value.eip_key].allocation_id : null
   )
 
   connectivity_type = each.value.connectivity_type
   private_ip        = each.value.private_ip
 
-  subnet_id = each.value.subnet_id != null ? each.value.subnet_id : aws_subnet.this[each.value.subnet_key].id
+  subnet_id = each.value.subnet_id != null ? each.value.subnet_id : aws_subnet.lz_aws_subnet[each.value.subnet_key].id
 
   tags = each.value.tags
 
@@ -147,7 +147,7 @@ resource "aws_route_table" "lz_aws_route_table" {
 resource "aws_route" "lz_aws_route" {
   for_each = var.routes
 
-  route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.this[each.value.route_table_key].id
+  route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.lz_aws_route_table[each.value.route_table_key].id
 
   destination_cidr_block      = each.value.destination_cidr_block
   destination_ipv6_cidr_block = each.value.destination_ipv6_cidr_block
@@ -159,10 +159,10 @@ resource "aws_route" "lz_aws_route" {
   egress_only_gateway_id = each.value.egress_only_gateway_id
 
   gateway_id = each.value.gateway_id != null ? each.value.gateway_id : (
-    each.value.igw_ref == true ? aws_internet_gateway.this[0].id : null
+    each.value.igw_ref == true ? aws_internet_gateway.lz_aws_internet_gateway[0].id : null
   )
 
-  nat_gateway_id            = each.value.nat_gateway_id != null ? each.value.nat_gateway_id : (each.value.nat_gateway_key != null ? aws_nat_gateway.this[each.value.nat_gateway_key].id : null)
+  nat_gateway_id            = each.value.nat_gateway_id != null ? each.value.nat_gateway_id : (each.value.nat_gateway_key != null ? aws_nat_gateway.lz_aws_nat_gateway[each.value.nat_gateway_key].id : null)
   local_gateway_id          = each.value.local_gateway_id
   network_interface_id      = each.value.network_interface_id
   transit_gateway_id        = each.value.transit_gateway_id
@@ -175,9 +175,9 @@ resource "aws_route" "lz_aws_route" {
 resource "aws_route_table_association" "lz_aws_route_table_association" {
   for_each = var.route_table_associations
 
-  route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.this[each.value.route_table_key].id
+  route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.lz_aws_route_table[each.value.route_table_key].id
 
-  subnet_id  = each.value.subnet_id != null ? each.value.subnet_id : (each.value.subnet_key != null ? aws_subnet.this[each.value.subnet_key].id : null)
+  subnet_id  = each.value.subnet_id != null ? each.value.subnet_id : (each.value.subnet_key != null ? aws_subnet.lz_aws_subnet[each.value.subnet_key].id : null)
   gateway_id = each.value.gateway_id
 
   region = each.value.region
