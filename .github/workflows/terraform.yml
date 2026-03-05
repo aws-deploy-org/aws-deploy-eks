@@ -1,0 +1,329 @@
+name: 'Terraform Infrastructure Pipeline'
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read    # Required to checkout code
+  pull-requests: write  # Required to comment on PRs
+
+env:
+  TF_VERSION: '1.14.6'
+  TF_WORKSPACE: ${{ github.event.inputs.environment || 'dev' }}
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  # ===============================================
+  # Job 1: Validation & Quality Checks
+  # ===============================================
+  terraform-validate:
+    name: 'Validate & Lint'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init (for validation)
+        id: init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Initialize TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        id: tflint
+        run: tflint --format=compact --recursive
+
+      - name: Setup Checkov
+        run: pip3 install checkov
+
+      - name: Run Checkov Security Scan
+        id: checkov
+        run: |
+          checkov -d . --quiet --compact \
+            --framework terraform \
+            --output cli \
+            --soft-fail
+        continue-on-error: true
+
+      - name: Comment PR with Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### TFLint 📖\`${{ steps.tflint.outcome }}\`
+            #### Checkov Security 🔒\`${{ steps.checkov.outcome }}\`
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+  # ===============================================
+  # Job 2: Terraform Plan
+  # ===============================================
+  terraform-plan:
+    name: 'Plan Infrastructure'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    defaults:
+      run:
+        working-directory: ./terraform
+    outputs:
+      tfplanExitCode: ${{ steps.plan.outputs.exitcode }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-TerraformPlan
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}"
+
+      - name: Terraform Workspace
+        run: |
+          terraform workspace select ${{ env.TF_WORKSPACE }} || \
+          terraform workspace new ${{ env.TF_WORKSPACE }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var-file="environments/${{ env.TF_WORKSPACE }}/terraform.tfvars" \
+            -out=tfplan \
+            -no-color \
+            -detailed-exitcode
+        continue-on-error: true
+
+      - name: Save Plan Output
+        if: steps.plan.outcome == 'success'
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload Plan Artifact
+        if: steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ env.TF_WORKSPACE }}
+          path: |
+            terraform/tfplan
+            terraform/tfplan.txt
+          retention-days: 5
+
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/tfplan.txt', 'utf8');
+            const truncatedPlan = plan.length > 65000 ? plan.substring(0, 65000) + '\n\n...truncated...' : plan;
+            
+            const output = `#### Terraform Plan 📖
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`terraform
+            ${truncatedPlan}
+            \`\`\`
+            
+            </details>
+            
+            *Environment: \`${{ env.TF_WORKSPACE }}\`*
+            *Plan Exit Code: \`${{ steps.plan.outputs.exitcode }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Fail on Plan Error
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ===============================================
+  # Job 3: Manual Approval Gate
+  # ===============================================
+  approval:
+    name: 'Manual Approval Required'
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      github.ref == 'refs/heads/main' && 
+      needs.terraform-plan.outputs.tfplanExitCode == '2' &&
+      (github.event.inputs.environment == 'prod' || github.event.inputs.environment == 'staging')
+    environment:
+      name: approval-${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Wait for Approval
+        run: echo "Manual approval received. Proceeding to apply..."
+
+  # ===============================================
+  # Job 4: Terraform Apply
+  # ===============================================
+  terraform-apply:
+    name: 'Apply Infrastructure'
+    runs-on: ubuntu-latest
+    needs: [terraform-plan, approval]
+    if: |
+      always() &&
+      needs.terraform-plan.result == 'success' &&
+      needs.terraform-plan.outputs.tfplanExitCode == '2' &&
+      (needs.approval.result == 'success' || needs.approval.result == 'skipped')
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    defaults:
+      run:
+        working-directory: ./terraform
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-TerraformApply
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ env.TF_WORKSPACE }}
+          path: ./terraform
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}"
+
+      - name: Terraform Workspace
+        run: terraform workspace select ${{ env.TF_WORKSPACE }}
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get Terraform Outputs
+        id: outputs
+        if: steps.apply.outcome == 'success'
+        run: terraform output -json > outputs.json
+
+      - name: Upload Outputs
+        if: steps.apply.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-${{ env.TF_WORKSPACE }}
+          path: terraform/outputs.json
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::Terraform apply failed for ${{ env.TF_WORKSPACE }} environment"
+          exit 1
+
+  # ===============================================
+  # Job 5: Post-Deployment Verification (Optional)
+  # ===============================================
+  post-deploy-tests:
+    name: 'Post-Deployment Tests'
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    if: success()
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Smoke Tests
+        run: |
+          echo "Running post-deployment verification..."
+          # Add your smoke tests here
+          # e.g., curl health endpoints, check AWS resources, etc.
