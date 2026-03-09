@@ -7,7 +7,7 @@ terraform {
       name = "lz-infra-dev" 
     } 
   } 
-}
+
   
   required_version = ">= 1.7.0"
   
