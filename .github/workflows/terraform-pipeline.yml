@@ -418,7 +418,7 @@ jobs:
       - name: Set Workspace Name
         id: workspace
         run: |
-          WORKSPACE_NAME="vpc-infrastructure-${{ matrix.environment }}"
+          WORKSPACE_NAME="lz-infra-${{ matrix.environment }}"
           echo "name=$WORKSPACE_NAME" >> $GITHUB_OUTPUT
           echo "::notice::Planning for workspace: $WORKSPACE_NAME"
 
