@@ -1,19 +1,13 @@
-terraform {
-  # HCP Terraform Cloud backend
-  cloud {
-    organization = "Terraform-IaC-Deployments"  # Replace with your HCP organization name
+terraform { 
+  cloud { 
     
-    # Workspaces will be selected dynamically based on environment
-    # Workspace naming convention: {project}-{resource}-{environment}
-    # Example: vpc-infrastructure-dev
-    workspaces {
-      # Tag-based selection (optional)
-      tags = ["vpc", "networking"]
-      
-      # Or explicit workspace name (will be set via TF_WORKSPACE env var)
-      name = null  # Determined at runtime
-    }
-  }
+    organization = "Terraform-IaC-Deployments" 
+
+    workspaces { 
+      name = "lz-infra-dev" 
+    } 
+  } 
+}
   
   required_version = ">= 1.7.0"
   
