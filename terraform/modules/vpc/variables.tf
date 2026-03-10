@@ -68,8 +68,8 @@ variable "subnets" {
 
     enable_dns64 = optional(bool)
 
-    enable_resource_name_dns_a_record_on_launch     = optional(bool)
-    enable_resource_name_dns_aaaa_record_on_launch  = optional(bool)
+    enable_resource_name_dns_a_record_on_launch    = optional(bool)
+    enable_resource_name_dns_aaaa_record_on_launch = optional(bool)
 
     ipv6_native = optional(bool)
 
@@ -85,7 +85,7 @@ variable "subnets" {
     private_dns_hostname_type_on_launch = optional(string)
   }))
   default = {}
-    validation {
+  validation {
     condition = alltrue([
       for k, s in var.subnets :
       !(
@@ -118,13 +118,13 @@ variable "eips" {
     vpc    = optional(bool)
     domain = optional(string)
 
-    address             = optional(string)
-    public_ipv4_pool     = optional(string)
+    address                  = optional(string)
+    public_ipv4_pool         = optional(string)
     customer_owned_ipv4_pool = optional(string)
-    ipam_pool_id         = optional(string)
-    network_border_group = optional(string)
+    ipam_pool_id             = optional(string)
+    network_border_group     = optional(string)
 
-    instance         = optional(string)
+    instance          = optional(string)
     network_interface = optional(string)
 
     associate_with_private_ip = optional(string)
@@ -133,7 +133,7 @@ variable "eips" {
   }))
   default = {}
 
-    validation {
+  validation {
     condition = alltrue([
       for k, e in var.eips :
       !(
@@ -167,8 +167,8 @@ variable "nat_gateways" {
     secondary_private_ip_addresses     = optional(list(string))
 
     availability_zone_address = optional(list(object({
-      allocation_id       = optional(string)
-      private_ip          = optional(string)
+      allocation_id        = optional(string)
+      private_ip           = optional(string)
       network_border_group = optional(string)
     })), [])
   }))
@@ -215,16 +215,16 @@ variable "routes" {
     destination_prefix_list_id  = optional(string)
 
     carrier_gateway_id = optional(string)
-    core_network_arn    = optional(string)
+    core_network_arn   = optional(string)
 
     egress_only_gateway_id = optional(string)
     gateway_id             = optional(string)
 
     igw_ref = optional(bool) # if true, uses module IGW id
 
-    instance_id      = optional(string)
-    nat_gateway_id   = optional(string)
-    nat_gateway_key  = optional(string)
+    instance_id     = optional(string)
+    nat_gateway_id  = optional(string)
+    nat_gateway_key = optional(string)
 
     local_gateway_id          = optional(string)
     network_interface_id      = optional(string)
@@ -236,7 +236,7 @@ variable "routes" {
   }))
   default = {}
 
-    validation {
+  validation {
     condition = alltrue([
       for k, r in var.routes :
       (

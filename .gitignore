@@ -36,9 +36,6 @@ terraform.rc
 # This ensures everyone uses the same provider versions
 # .terraform.lock.hcl
 
-# Option 2: Ignore lock file (use if versions are pinned in code)
-.terraform.lock.hcl
-
 # ============================================================
 # Terraform Plan Files
 # ============================================================

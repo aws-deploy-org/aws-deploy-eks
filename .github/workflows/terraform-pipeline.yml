@@ -1,4 +1,4 @@
-name: 'Terraform Infrastructure Pipeline'
+name: 'TF Infrastructure Deployment Pipeline'
 
 on:
   push:

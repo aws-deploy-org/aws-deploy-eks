@@ -10,22 +10,22 @@ resource "aws_vpc" "lz_aws_vpc" {
 
   assign_generated_ipv6_cidr_block = var.vpc.assign_generated_ipv6_cidr_block
 
-  ipv4_ipam_pool_id    = var.vpc.ipv4_ipam_pool_id
-  ipv4_netmask_length  = var.vpc.ipv4_netmask_length
-  ipv6_cidr_block      = var.vpc.ipv6_cidr_block
-  ipv6_ipam_pool_id    = var.vpc.ipv6_ipam_pool_id
-  ipv6_netmask_length  = var.vpc.ipv6_netmask_length
+  ipv4_ipam_pool_id                    = var.vpc.ipv4_ipam_pool_id
+  ipv4_netmask_length                  = var.vpc.ipv4_ipam_pool_id != null ? var.vpc.ipv4_netmask_length : null
+  ipv6_cidr_block                      = var.vpc.ipv6_cidr_block
+  ipv6_ipam_pool_id                    = var.vpc.ipv6_ipam_pool_id
+  ipv6_netmask_length                  = var.vpc.ipv6_netmask_length
   ipv6_cidr_block_network_border_group = var.vpc.ipv6_cidr_block_network_border_group
 
   enable_network_address_usage_metrics = var.vpc.enable_network_address_usage_metrics
 
   tags = var.vpc.tags
 
-  region = var.vpc.region
+  #region = var.vpc.region
 }
 
 resource "aws_subnet" "lz_aws_subnet" {
-  for_each = var.subnets
+  for_each = var.create_vpc ? var.subnets : {}
 
   vpc_id = coalesce(each.value.vpc_id, local.vpc_id)
 
@@ -40,8 +40,8 @@ resource "aws_subnet" "lz_aws_subnet" {
 
   outpost_arn = each.value.outpost_arn
 
-  enable_dns64                                 = each.value.enable_dns64
-  enable_resource_name_dns_a_record_on_launch  = each.value.enable_resource_name_dns_a_record_on_launch
+  enable_dns64                                   = each.value.enable_dns64
+  enable_resource_name_dns_a_record_on_launch    = each.value.enable_resource_name_dns_a_record_on_launch
   enable_resource_name_dns_aaaa_record_on_launch = each.value.enable_resource_name_dns_aaaa_record_on_launch
 
   ipv6_native         = each.value.ipv6_native
@@ -61,24 +61,24 @@ resource "aws_subnet" "lz_aws_subnet" {
 }
 
 resource "aws_internet_gateway" "lz_aws_internet_gateway" {
-  count = var.create_internet_gateway ? 1 : 0
+  count = (var.create_vpc && var.create_internet_gateway) ? 1 : 0
 
   vpc_id = var.internet_gateway.vpc_id != null ? var.internet_gateway.vpc_id : local.vpc_id
   tags   = var.internet_gateway.tags
 }
 
 resource "aws_eip" "lz_aws_eip" {
-  for_each = var.eips
+  for_each = var.create_vpc ? var.eips : {}
 
-   domain = each.value.domain
+  domain = each.value.domain
 
-  address                 = each.value.address
+  address                  = each.value.address
   public_ipv4_pool         = each.value.public_ipv4_pool
   customer_owned_ipv4_pool = each.value.customer_owned_ipv4_pool
   ipam_pool_id             = each.value.ipam_pool_id
   network_border_group     = each.value.network_border_group
 
-  instance        = each.value.instance
+  instance          = each.value.instance
   network_interface = each.value.network_interface
 
   associate_with_private_ip = each.value.associate_with_private_ip
@@ -87,29 +87,25 @@ resource "aws_eip" "lz_aws_eip" {
 }
 
 resource "aws_nat_gateway" "lz_aws_nat_gateway" {
-  for_each = var.nat_gateways
+  for_each = var.create_vpc ? var.nat_gateways : {}
 
-  allocation_id = each.value.allocation_id != null ? each.value.allocation_id : (
-    each.value.eip_key != null ? aws_eip.lz_aws_eip[each.value.eip_key].allocation_id : null
-  )
+  allocation_id = each.value.availability_mode == "regional" ? null : (each.value.allocation_id != null ? each.value.allocation_id : (
+  each.value.eip_key != null ? aws_eip.lz_aws_eip[each.value.eip_key].id : null))
 
   connectivity_type = each.value.connectivity_type
-  private_ip        = each.value.private_ip
+  private_ip        = (each.value.availability_mode == "regional") ? null : (each.value.private_ip != null ? each.value.private_ip : null)
 
-  subnet_id = each.value.subnet_id != null ? each.value.subnet_id : aws_subnet.lz_aws_subnet[each.value.subnet_key].id
+  subnet_id = (each.value.availability_mode == "regional") ? null : each.value.subnet_id
 
   tags = each.value.tags
 
-  availability_mode    = each.value.availability_mode
- 
-  secondary_allocation_ids           = each.value.secondary_allocation_ids
-  secondary_private_ip_address_count = each.value.secondary_private_ip_address_count
-  secondary_private_ip_addresses     = each.value.secondary_private_ip_addresses
+  availability_mode = each.value.availability_mode
+
 
   dynamic "availability_zone_address" {
     for_each = each.value.availability_zone_address
     content {
-      allocation_ids      = availability_zone_address.value.allocation_ids
+      allocation_ids       = availability_zone_address.value.allocation_ids
       availability_zone    = availability_zone_address.value.availability_zone != null ? availability_zone_address.value.availability_zone : null
       availability_zone_id = availability_zone_address.value.availability_zone != null ? null : availability_zone_address.value.availability_zone_id
     }
@@ -117,7 +113,7 @@ resource "aws_nat_gateway" "lz_aws_nat_gateway" {
 }
 
 resource "aws_route_table" "lz_aws_route_table" {
-  for_each = var.route_tables
+  for_each = var.create_vpc ? var.route_tables : {}
 
   vpc_id = each.value.vpc_id != null ? each.value.vpc_id : local.vpc_id
 
@@ -145,7 +141,7 @@ resource "aws_route_table" "lz_aws_route_table" {
 }
 
 resource "aws_route" "lz_aws_route" {
-  for_each = var.routes
+  for_each = var.create_vpc ? var.routes : {}
 
   route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.lz_aws_route_table[each.value.route_table_key].id
 
@@ -154,7 +150,7 @@ resource "aws_route" "lz_aws_route" {
   destination_prefix_list_id  = each.value.destination_prefix_list_id
 
   carrier_gateway_id = each.value.carrier_gateway_id
-  core_network_arn    = each.value.core_network_arn
+  core_network_arn   = each.value.core_network_arn
 
   egress_only_gateway_id = each.value.egress_only_gateway_id
 
@@ -169,16 +165,16 @@ resource "aws_route" "lz_aws_route" {
   vpc_endpoint_id           = each.value.vpc_endpoint_id
   vpc_peering_connection_id = each.value.vpc_peering_connection_id
 
-  region = each.value.region
+  #region = each.value.region
 }
 
 resource "aws_route_table_association" "lz_aws_route_table_association" {
-  for_each = var.route_table_associations
+  for_each = var.create_vpc ? var.route_table_associations : {}
 
   route_table_id = each.value.route_table_id != null ? each.value.route_table_id : aws_route_table.lz_aws_route_table[each.value.route_table_key].id
 
-  subnet_id  = each.value.subnet_id != null ? each.value.subnet_id : (each.value.subnet_key != null ? aws_subnet.lz_aws_subnet[each.value.subnet_key].id : null)
+  subnet_id  = each.value.subnet_id != null ? each.value.subnet_id : null
   gateway_id = each.value.gateway_id
 
-  region = each.value.region
+  # region = each.value.region
 }
