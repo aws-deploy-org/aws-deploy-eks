@@ -8,16 +8,6 @@ variable "create_vpc" {
   description = "Whether to create a new VPC."
   type        = bool
   default     = true
-  validation {
-    condition     = var.create_vpc || (var.existing_vpc_id != null && var.existing_vpc_id != "")
-    error_message = "When create_vpc=false, existing_vpc_id must be set."
-  }
-}
-
-variable "existing_vpc_id" {
-  description = "Existing VPC ID when create_vpc=false."
-  type        = string
-  default     = null
 }
 
 variable "vpc" {
