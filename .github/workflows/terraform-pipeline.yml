@@ -50,7 +50,7 @@ permissions:
 
 env:
   TF_VERSION: '1.7.0'
-  TFC_ORGANIZATION: 'deloitte-infrastructure'
+  TFC_ORGANIZATION: 'Terraform-IaC-Deployments'  # Replace with your HCP Terraform organization name
   TERRAFORM_DIR: './terraform'
 
 jobs:
