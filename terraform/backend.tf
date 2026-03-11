@@ -19,7 +19,7 @@ terraform {
   }
 }
 
-# Provider configuration - credentials come from HCP workspace
+# Provider configuration - credentials come from HCP ws
 provider "aws" {
   region = var.region
 
