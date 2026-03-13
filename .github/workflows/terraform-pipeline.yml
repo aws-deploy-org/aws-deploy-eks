@@ -509,7 +509,7 @@ jobs:
       - name: Upload to HCP Terraform
         run: |
           echo "Uploading configuration to HCP Terraform..."
-          curl -s \
+          curl -s --ssl-no-revoke\
             --header "Content-Type: application/octet-stream" \
             --request PUT \
             --data-binary @terraform-config.tar.gz \
